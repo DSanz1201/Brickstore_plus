@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <winsock2.h>
-
 #include <vector>
 
 struct ItemCarrito {
@@ -234,7 +233,7 @@ void menuAdmin(SOCKET sock) {
 
 void menuUsuario(SOCKET sock, int idUsuario) {
     int opcion = 0;
-    std::vector<ItemCarrito> carrito; // Cesta de compra en memoria
+    std::vector<ItemCarrito> carrito;
 
     while (opcion != 6) {
         printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
@@ -248,7 +247,6 @@ void menuUsuario(SOCKET sock, int idUsuario) {
         scanf("%d", &opcion);
 
         if (opcion == 1) {
-            // Envía la petición para listar productos al servidor
             enviarYRecibir(sock, "LISTAR");
         }
         else if (opcion == 2) {
@@ -359,27 +357,34 @@ int main() {
     else if (tipoUsuario == 2) {
         int opcionAuth = 0;
         int idUsuarioLogueado = -1;
+        bool sesionActiva = false
 
-        printf("\n1. Iniciar Sesion\n");
-        printf("2. Registrarse\n");
-        printf("Seleccione una opcion: ");
-        scanf("%d", &opcionAuth);
+        while (!sesionActiva && opcionAuth != 3) {
+            printf("\n--- MENU DE AUTENTICACION ---\n");
+            printf("1. Iniciar Sesion\n");
+            printf("2. Registrarse\n");
+            printf("3. Salir\n");
+            printf("Seleccione una opcion: ");
+            scanf("%d", &opcionAuth);
 
-        if (opcionAuth == 1) {
-            if (loginUsuarioCorriente(sock, idUsuarioLogueado)) {
-                menuUsuario(sock, idUsuarioLogueado);
-            } else {
-                printf("Login incorrecto.\n");
+            if (opcionAuth == 1) {
+                if (loginUsuarioCorriente(sock, idUsuarioLogueado)) {
+                    sesionActiva = true;
+                    menuUsuario(sock, idUsuarioLogueado);
+                } else {
+                    printf("Login incorrecto. Por favor, intentalo de nuevo.\n");
+                }
             }
-        } else if (opcionAuth == 2) {
-            registrarUsuario(sock);
-        } else {
-            printf("Opcion no válida.\n");
+            else if (opcionAuth == 2) {
+                registrarUsuario(sock);
+            }
+            else if (opcionAuth == 3) {
+                enviarYRecibir(sock, "SALIR");
+            }
+            else {
+                printf("Opcion no valida.\n");
+            }
         }
-    }
-
-    else {
-        printf("Opcion no valida.\n");
     }
 
     printf("Cerrando cliente...\n");
