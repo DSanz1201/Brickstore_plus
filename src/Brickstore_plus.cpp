@@ -12,6 +12,12 @@
 #include <string.h>
 #include <winsock2.h>
 
+#include <vector>
+
+struct ItemCarrito {
+    int id_producto;
+    int cantidad;
+};
 
 #define PORT 5000
 #define BUFFER_SIZE 4096
@@ -65,6 +71,56 @@ int loginAdmin(SOCKET sock) {
         }
     }
 
+    return 0;
+}
+
+int registrarUsuario(SOCKET sock) {
+    char nombre[50];
+    char email[80];
+    char password[30];
+    char comando[300];
+
+    printf("\n--- REGISTRO DE NUEVO USUARIO ---\n");
+    printf("Nombre: ");
+    scanf(" %[^\n]", nombre);
+    printf("Email: ");
+    scanf("%s", email);
+    printf("Password: ");
+    scanf("%s", password);
+
+    // Siguiendo el formato de punto y coma ';' que usa tu servidor actual
+    sprintf(comando, "REGISTER;%s;%s;%s", nombre, email, password);
+    enviarYRecibir(sock, comando);
+    return 1;
+}
+
+int loginUsuarioCorriente(SOCKET sock, int &idUsuario) {
+    char email[80];
+    char password[30];
+    char comando[200];
+    char respuesta[4096];
+
+    printf("\n--- LOGIN USUARIO CORRIENTE ---\n");
+    printf("Email: ");
+    scanf("%s", email);
+    printf("Password: ");
+    scanf("%s", password);
+
+    sprintf(comando, "LOGIN;%s;%s", email, password);
+    send(sock, comando, strlen(comando), 0);
+
+    memset(respuesta, 0, sizeof(respuesta));
+    int bytes = recv(sock, respuesta, sizeof(respuesta) - 1, 0);
+
+    if (bytes > 0) {
+        respuesta[bytes] = '\0';
+        printf("[CLIENTE] Respuesta servidor: %s\n", respuesta);
+
+        if (strncmp(respuesta, "OK", 2) == 0) {
+            sscanf(respuesta, "OK;USER;%d", &idUsuario);
+            return 1;
+        }
+    }
     return 0;
 }
 
@@ -176,6 +232,93 @@ void menuAdmin(SOCKET sock) {
     }
 }
 
+void menuUsuario(SOCKET sock, int idUsuario) {
+    int opcion = 0;
+    std::vector<ItemCarrito> carrito; // Cesta de compra en memoria
+
+    while (opcion != 6) {
+        printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
+        printf("1. Ver catalogo de productos\n");
+        printf("2. Ver detalle de un producto\n");
+        printf("3. Añadir producto al carrito\n");
+        printf("4. Ver carrito y confirmar pedido\n");
+        printf("5. Consultar historial de pedidos\n");
+        printf("6. Salir\n");
+        printf("Seleccione una opcion: ");
+        scanf("%d", &opcion);
+
+        if (opcion == 1) {
+            // Envía la petición para listar productos al servidor
+            enviarYRecibir(sock, "LISTAR");
+        }
+        else if (opcion == 2) {
+            int id;
+            char comando[100];
+            printf("Introduce el ID del producto que deseas consultar: ");
+            scanf("%d", &id);
+            sprintf(comando, "GET_PRODUCT_DETAIL;%d", id);
+            enviarYRecibir(sock, comando);
+        }
+        else if (opcion == 3) {
+            int id, cant;
+            printf("ID del producto a añadir: ");
+            scanf("%d", &id);
+            printf("Cantidad: ");
+            scanf("%d", &cant);
+
+            ItemCarrito item = {id, cant};
+            carrito.push_back(item);
+            printf("Producto añadido al carrito local.\n");
+        }
+        else if (opcion == 4) {
+            if (carrito.empty()) {
+                printf("El carrito está vacío.\n");
+            } else {
+                printf("\n--- TU CARRITO ---\n");
+                for (const auto& item : carrito) {
+                    printf("ID Producto: %d | Cantidad: %d\n", item.id_producto, item.cantidad);
+                }
+
+                char confirmar;
+                printf("¿Deseas confirmar el pedido? (s/n): ");
+                scanf(" %c", &confirmar);
+
+                if (confirmar == 's' || confirmar == 'S') {
+                    // Construir el comando de compra (Ej: CREATE_ORDER;id_usuario;id_prod:cant,id_prod:cant)
+                    char comando[1024];
+                    sprintf(comando, "CREATE_ORDER;%d;", idUsuario);
+
+                    char infoProductos[512] = "";
+                    for (size_t i = 0; i < carrito.size(); ++i) {
+                        char temp[50];
+                        sprintf(temp, "%d:%d", carrito[i].id_producto, carrito[i].cantidad);
+                        strcat(infoProductos, temp);
+                        if (i < carrito.size() - 1) {
+                            strcat(infoProductos, ",");
+                        }
+                    }
+                    strcat(comando, infoProductos);
+
+                    enviarYRecibir(sock, comando);
+                    carrito.clear(); // Vaciar carrito tras la compra
+                }
+            }
+        }
+        else if (opcion == 5) {
+            char comando[100];
+            sprintf(comando, "GET_ORDERS;%d", idUsuario);
+            enviarYRecibir(sock, comando);
+        }
+        else if (opcion == 6) {
+            enviarYRecibir(sock, "SALIR");
+            printf("Cerrando sesión de usuario...\n");
+        }
+        else {
+            printf("Opcion no valida.\n");
+        }
+    }
+}
+
 int main() {
     setbuf(stdout, NULL);
 
@@ -214,7 +357,25 @@ int main() {
     }
 
     else if (tipoUsuario == 2) {
-        printf("Parte de usuario corriente no implementada.\n");
+        int opcionAuth = 0;
+        int idUsuarioLogueado = -1;
+
+        printf("\n1. Iniciar Sesion\n");
+        printf("2. Registrarse\n");
+        printf("Seleccione una opcion: ");
+        scanf("%d", &opcionAuth);
+
+        if (opcionAuth == 1) {
+            if (loginUsuarioCorriente(sock, idUsuarioLogueado)) {
+                menuUsuario(sock, idUsuarioLogueado);
+            } else {
+                printf("Login incorrecto.\n");
+            }
+        } else if (opcionAuth == 2) {
+            registrarUsuario(sock);
+        } else {
+            printf("Opcion no válida.\n");
+        }
     }
 
     else {
