@@ -236,16 +236,18 @@ void menuUsuario(SOCKET sock, int idUsuario) {
     int opcion = 0;
     std::vector<ItemCarrito> carrito; // Cesta de compra en memoria
 
-    while (opcion != 6) {
-        printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
-        printf("1. Ver catalogo de productos\n");
-        printf("2. Ver detalle de un producto\n");
-        printf("3. Añadir producto al carrito\n");
-        printf("4. Ver carrito y confirmar pedido\n");
-        printf("5. Consultar historial de pedidos\n");
-        printf("6. Salir\n");
-        printf("Seleccione una opcion: ");
-        scanf("%d", &opcion);
+    while (opcion != 8) {
+    	printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
+    	printf("1. Ver catalogo de productos\n");
+    	printf("2. Ver detalle de un producto\n");
+    	printf("3. Añadir producto al carrito\n");
+    	printf("4. Ver carrito y confirmar pedido\n");
+    	printf("5. Consultar historial de pedidos\n");
+    	printf("6. Ver todas las valoraciones\n");
+    	printf("7. Dejar una valoracion\n");
+    	printf("8. Salir\n");
+    	printf("Seleccione una opcion: ");
+    	scanf("%d", &opcion);
 
         if (opcion == 1) {
             enviarYRecibir(sock, "LISTAR");
@@ -283,7 +285,6 @@ void menuUsuario(SOCKET sock, int idUsuario) {
                 scanf(" %c", &confirmar);
 
                 if (confirmar == 's' || confirmar == 'S') {
-                    // Construir el comando de compra (Ej: CREATE_ORDER;id_usuario;id_prod:cant,id_prod:cant)
                     char comando[1024];
                     sprintf(comando, "CREATE_ORDER;%d;", idUsuario);
 
@@ -299,7 +300,7 @@ void menuUsuario(SOCKET sock, int idUsuario) {
                     strcat(comando, infoProductos);
 
                     enviarYRecibir(sock, comando);
-                    carrito.clear(); // Vaciar carrito tras la compra
+                    carrito.clear();
                 }
             }
         }
@@ -309,6 +310,26 @@ void menuUsuario(SOCKET sock, int idUsuario) {
             enviarYRecibir(sock, comando);
         }
         else if (opcion == 6) {
+            enviarYRecibir(sock, "VALORACIONES");
+        }
+        else if (opcion == 7) {
+            int id_prod, puntuacion;
+            char comentario[200];
+            char comando[512];
+
+            printf("ID del producto a valorar: ");
+            scanf("%d", &id_prod);
+
+            printf("Puntuacion (1 a 5): ");
+            scanf("%d", &puntuacion);
+
+            printf("Comentario: ");
+            scanf(" %[^\n]", comentario);
+
+            sprintf(comando, "ADD_VALORACION;%d;%d;%d;%s", idUsuario, id_prod, puntuacion, comentario);
+            enviarYRecibir(sock, comando);
+        }
+        else if (opcion == 8) {
             enviarYRecibir(sock, "SALIR");
             printf("Cerrando sesión de usuario...\n");
         }
