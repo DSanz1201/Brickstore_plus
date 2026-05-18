@@ -12,6 +12,7 @@
 #include <string.h>
 #include <winsock2.h>
 #include <vector>
+#include <string>
 
 struct ItemCarrito {
     int id_producto;
@@ -233,7 +234,7 @@ void menuAdmin(SOCKET sock) {
 
 void menuUsuario(SOCKET sock, int idUsuario) {
     int opcion = 0;
-    std::vector<ItemCarrito> carrito;
+    std::vector<ItemCarrito> carrito; // Cesta de compra en memoria
 
     while (opcion != 6) {
         printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
@@ -357,7 +358,7 @@ int main() {
     else if (tipoUsuario == 2) {
         int opcionAuth = 0;
         int idUsuarioLogueado = -1;
-        bool sesionActiva = false
+        bool sesionActiva = false;
 
         while (!sesionActiva && opcionAuth != 3) {
             printf("\n--- MENU DE AUTENTICACION ---\n");
