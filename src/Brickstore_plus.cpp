@@ -6,21 +6,59 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <winsock2.h>
 #include <vector>
-#include <string>
+
+#define PORT 5000
+#define BUFFER_SIZE 4096
 
 struct ItemCarrito {
     int id_producto;
     int cantidad;
 };
 
-#define PORT 5000
-#define BUFFER_SIZE 4096
+void enviarYRecibir(SOCKET sock, const char *comando) {
+    char respuesta[BUFFER_SIZE];
+
+    send(sock, comando, strlen(comando), 0);
+    memset(respuesta, 0, BUFFER_SIZE);
+
+    int bytes = recv(sock, respuesta, BUFFER_SIZE - 1, 0);
+
+    if (bytes > 0) {
+        respuesta[bytes] = '\0';
+        printf("%s\n", respuesta);
+    } else {
+        printf("Error recibiendo respuesta del servidor.\n");
+    }
+}
+
+int comprobarStockProducto(SOCKET sock, int idProducto, int cantidad) {
+    char comando[100];
+    char respuesta[BUFFER_SIZE];
+
+    sprintf(comando, "CHECK_STOCK;%d;%d", idProducto, cantidad);
+
+    send(sock, comando, strlen(comando), 0);
+    memset(respuesta, 0, BUFFER_SIZE);
+
+    int bytes = recv(sock, respuesta, BUFFER_SIZE - 1, 0);
+
+    if (bytes > 0) {
+        respuesta[bytes] = '\0';
+        printf("%s\n", respuesta);
+
+        if (strncmp(respuesta, "OK", 2) == 0) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 void eliminarUnProductoCarrito(std::vector<ItemCarrito> &carrito) {
     if (carrito.empty()) {
         printf("El carrito esta vacio.\n");
@@ -28,20 +66,23 @@ void eliminarUnProductoCarrito(std::vector<ItemCarrito> &carrito) {
     }
 
     int idEliminar;
-    bool encontrado = false;
+    int encontrado = 0;
 
     printf("\n--- TU CARRITO ---\n");
-    for (const auto& item : carrito) {
-        printf("ID Producto: %d | Cantidad: %d\n", item.id_producto, item.cantidad);
+
+    for (size_t i = 0; i < carrito.size(); i++) {
+        printf("ID Producto: %d | Cantidad: %d\n",
+               carrito[i].id_producto,
+               carrito[i].cantidad);
     }
 
     printf("ID del producto a eliminar: ");
     scanf("%d", &idEliminar);
 
-    for (size_t i = 0; i < carrito.size(); ++i) {
+    for (size_t i = 0; i < carrito.size(); i++) {
         if (carrito[i].id_producto == idEliminar) {
             carrito.erase(carrito.begin() + i);
-            encontrado = true;
+            encontrado = 1;
             printf("Producto eliminado del carrito.\n");
             break;
         }
@@ -61,28 +102,12 @@ void vaciarCarrito(std::vector<ItemCarrito> &carrito) {
     carrito.clear();
     printf("Carrito vaciado correctamente.\n");
 }
-void enviarYRecibir(SOCKET sock, const char *comando) {
-    char respuesta[BUFFER_SIZE];
-
-    send(sock, comando, strlen(comando), 0);
-
-    memset(respuesta, 0, BUFFER_SIZE);
-
-    int bytes = recv(sock, respuesta, BUFFER_SIZE - 1, 0);
-
-    if (bytes > 0) {
-        respuesta[bytes] = '\0';
-        printf("%s\n", respuesta);
-    } else {
-        printf("Error recibiendo respuesta del servidor.\n");
-    }
-}
 
 int loginAdmin(SOCKET sock) {
     char email[80];
     char password[30];
     char comando[200];
-    char respuesta[4096];
+    char respuesta[BUFFER_SIZE];
 
     printf("\n--- LOGIN ADMINISTRADOR ---\n");
 
@@ -94,19 +119,16 @@ int loginAdmin(SOCKET sock) {
 
     sprintf(comando, "LOGIN;%s;%s", email, password);
 
-    printf("[CLIENTE] Enviando: %s\n", comando);
-
     send(sock, comando, strlen(comando), 0);
+    memset(respuesta, 0, BUFFER_SIZE);
 
-    memset(respuesta, 0, sizeof(respuesta));
-
-    int bytes = recv(sock, respuesta, sizeof(respuesta) - 1, 0);
+    int bytes = recv(sock, respuesta, BUFFER_SIZE - 1, 0);
 
     if (bytes > 0) {
         respuesta[bytes] = '\0';
         printf("[CLIENTE] Respuesta servidor: %s\n", respuesta);
 
-        if (strncmp(respuesta, "OK", 2) == 0) {
+        if (strncmp(respuesta, "OK;ADMIN", 8) == 0) {
             return 1;
         }
     }
@@ -121,16 +143,20 @@ int registrarUsuario(SOCKET sock) {
     char comando[300];
 
     printf("\n--- REGISTRO DE NUEVO USUARIO ---\n");
+
     printf("Nombre: ");
     scanf(" %[^\n]", nombre);
+
     printf("Email: ");
     scanf("%s", email);
+
     printf("Password: ");
     scanf("%s", password);
 
-    // Siguiendo el formato de punto y coma ';' que usa tu servidor actual
     sprintf(comando, "REGISTER;%s;%s;%s", nombre, email, password);
+
     enviarYRecibir(sock, comando);
+
     return 1;
 }
 
@@ -138,29 +164,33 @@ int loginUsuarioCorriente(SOCKET sock, int &idUsuario) {
     char email[80];
     char password[30];
     char comando[200];
-    char respuesta[4096];
+    char respuesta[BUFFER_SIZE];
 
     printf("\n--- LOGIN USUARIO CORRIENTE ---\n");
+
     printf("Email: ");
     scanf("%s", email);
+
     printf("Password: ");
     scanf("%s", password);
 
     sprintf(comando, "LOGIN;%s;%s", email, password);
-    send(sock, comando, strlen(comando), 0);
 
-    memset(respuesta, 0, sizeof(respuesta));
-    int bytes = recv(sock, respuesta, sizeof(respuesta) - 1, 0);
+    send(sock, comando, strlen(comando), 0);
+    memset(respuesta, 0, BUFFER_SIZE);
+
+    int bytes = recv(sock, respuesta, BUFFER_SIZE - 1, 0);
 
     if (bytes > 0) {
         respuesta[bytes] = '\0';
         printf("[CLIENTE] Respuesta servidor: %s\n", respuesta);
 
-        if (strncmp(respuesta, "OK", 2) == 0) {
+        if (strncmp(respuesta, "OK;USER", 7) == 0) {
             sscanf(respuesta, "OK;USER;%d", &idUsuario);
             return 1;
         }
     }
+
     return 0;
 }
 
@@ -170,7 +200,7 @@ void menuAdmin(SOCKET sock) {
     while (opcion != 7) {
         printf("\n--- MENU DE ADMINISTRACION ---\n");
         printf("1. Visualizar catalogo de productos\n");
-        printf("2. Añadir nuevo producto\n");
+        printf("2. Anadir nuevo producto\n");
         printf("3. Modificar producto Stock/Precio\n");
         printf("4. Eliminar producto\n");
         printf("5. Ver valoraciones de clientes\n");
@@ -271,6 +301,7 @@ void menuAdmin(SOCKET sock) {
         }
     }
 }
+
 void menuUsuario(SOCKET sock, int idUsuario) {
     int opcion = 0;
     std::vector<ItemCarrito> carrito;
@@ -279,7 +310,7 @@ void menuUsuario(SOCKET sock, int idUsuario) {
         printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
         printf("1. Ver catalogo de productos\n");
         printf("2. Ver detalle de un producto\n");
-        printf("3. Añadir producto al carrito\n");
+        printf("3. Anadir producto al carrito\n");
         printf("4. Eliminar un producto del carrito\n");
         printf("5. Vaciar carrito completo\n");
         printf("6. Ver carrito y confirmar pedido\n");
@@ -302,24 +333,29 @@ void menuUsuario(SOCKET sock, int idUsuario) {
             scanf("%d", &id);
 
             sprintf(comando, "GET_PRODUCT_DETAIL;%d", id);
+
             enviarYRecibir(sock, comando);
         }
 
         else if (opcion == 3) {
             int id, cant;
 
-            printf("ID del producto a añadir: ");
+            printf("ID del producto a anadir: ");
             scanf("%d", &id);
 
             printf("Cantidad: ");
             scanf("%d", &cant);
 
-            if (cant <= 0) {
-                printf("La cantidad debe ser mayor que 0.\n");
-            } else {
-                ItemCarrito item = {id, cant};
+            if (comprobarStockProducto(sock, id, cant)) {
+                ItemCarrito item;
+                item.id_producto = id;
+                item.cantidad = cant;
+
                 carrito.push_back(item);
-                printf("Producto añadido al carrito local.\n");
+
+                printf("Producto anadido al carrito local.\n");
+            } else {
+                printf("No se ha anadido el producto al carrito.\n");
             }
         }
 
@@ -337,23 +373,23 @@ void menuUsuario(SOCKET sock, int idUsuario) {
             } else {
                 printf("\n--- TU CARRITO ---\n");
 
-                for (const auto& item : carrito) {
+                for (size_t i = 0; i < carrito.size(); i++) {
                     printf("ID Producto: %d | Cantidad: %d\n",
-                           item.id_producto,
-                           item.cantidad);
+                           carrito[i].id_producto,
+                           carrito[i].cantidad);
                 }
 
                 char confirmar;
-                printf("¿Deseas confirmar el pedido? (s/n): ");
+                printf("Deseas confirmar el pedido? (s/n): ");
                 scanf(" %c", &confirmar);
 
                 if (confirmar == 's' || confirmar == 'S') {
                     char comando[1024];
-                    sprintf(comando, "CREATE_ORDER;%d;", idUsuario);
-
                     char infoProductos[512] = "";
 
-                    for (size_t i = 0; i < carrito.size(); ++i) {
+                    sprintf(comando, "CREATE_ORDER;%d;", idUsuario);
+
+                    for (size_t i = 0; i < carrito.size(); i++) {
                         char temp[50];
 
                         sprintf(temp, "%d:%d",
@@ -370,6 +406,7 @@ void menuUsuario(SOCKET sock, int idUsuario) {
                     strcat(comando, infoProductos);
 
                     enviarYRecibir(sock, comando);
+
                     carrito.clear();
                 } else {
                     printf("Pedido cancelado.\n");
@@ -381,6 +418,7 @@ void menuUsuario(SOCKET sock, int idUsuario) {
             char comando[100];
 
             sprintf(comando, "GET_ORDERS;%d", idUsuario);
+
             enviarYRecibir(sock, comando);
         }
 
@@ -414,7 +452,7 @@ void menuUsuario(SOCKET sock, int idUsuario) {
 
         else if (opcion == 10) {
             enviarYRecibir(sock, "SALIR");
-            printf("Cerrando sesión de usuario...\n");
+            printf("Cerrando sesion de usuario...\n");
         }
 
         else {
@@ -422,6 +460,7 @@ void menuUsuario(SOCKET sock, int idUsuario) {
         }
     }
 }
+
 int main() {
     setbuf(stdout, NULL);
 
@@ -435,7 +474,7 @@ int main() {
     sock = socket(AF_INET, SOCK_STREAM, 0);
 
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(5000);
+    serverAddr.sin_port = htons(PORT);
     serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     if (connect(sock, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
@@ -480,12 +519,15 @@ int main() {
                     printf("Login incorrecto. Por favor, intentalo de nuevo.\n");
                 }
             }
+
             else if (opcionAuth == 2) {
                 registrarUsuario(sock);
             }
+
             else if (opcionAuth == 3) {
                 enviarYRecibir(sock, "SALIR");
             }
+
             else {
                 printf("Opcion no valida.\n");
             }
