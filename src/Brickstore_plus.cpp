@@ -1,6 +1,6 @@
 //============================================================================
 // Name        : Brickstore_plus.cpp
-// Author      : 
+// Author      :
 // Version     :
 // Copyright   : Your copyright notice
 // Description : Hello World in C++, Ansi-style
@@ -21,6 +21,46 @@ struct ItemCarrito {
 
 #define PORT 5000
 #define BUFFER_SIZE 4096
+void eliminarUnProductoCarrito(std::vector<ItemCarrito> &carrito) {
+    if (carrito.empty()) {
+        printf("El carrito esta vacio.\n");
+        return;
+    }
+
+    int idEliminar;
+    bool encontrado = false;
+
+    printf("\n--- TU CARRITO ---\n");
+    for (const auto& item : carrito) {
+        printf("ID Producto: %d | Cantidad: %d\n", item.id_producto, item.cantidad);
+    }
+
+    printf("ID del producto a eliminar: ");
+    scanf("%d", &idEliminar);
+
+    for (size_t i = 0; i < carrito.size(); ++i) {
+        if (carrito[i].id_producto == idEliminar) {
+            carrito.erase(carrito.begin() + i);
+            encontrado = true;
+            printf("Producto eliminado del carrito.\n");
+            break;
+        }
+    }
+
+    if (!encontrado) {
+        printf("Ese producto no esta en el carrito.\n");
+    }
+}
+
+void vaciarCarrito(std::vector<ItemCarrito> &carrito) {
+    if (carrito.empty()) {
+        printf("El carrito ya esta vacio.\n");
+        return;
+    }
+
+    carrito.clear();
+    printf("Carrito vaciado correctamente.\n");
+}
 void enviarYRecibir(SOCKET sock, const char *comando) {
     char respuesta[BUFFER_SIZE];
 
@@ -231,53 +271,76 @@ void menuAdmin(SOCKET sock) {
         }
     }
 }
-
 void menuUsuario(SOCKET sock, int idUsuario) {
     int opcion = 0;
-    std::vector<ItemCarrito> carrito; // Cesta de compra en memoria
+    std::vector<ItemCarrito> carrito;
 
-    while (opcion != 8) {
-    	printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
-    	printf("1. Ver catalogo de productos\n");
-    	printf("2. Ver detalle de un producto\n");
-    	printf("3. Añadir producto al carrito\n");
-    	printf("4. Ver carrito y confirmar pedido\n");
-    	printf("5. Consultar historial de pedidos\n");
-    	printf("6. Ver todas las valoraciones\n");
-    	printf("7. Dejar una valoracion\n");
-    	printf("8. Salir\n");
-    	printf("Seleccione una opcion: ");
-    	scanf("%d", &opcion);
+    while (opcion != 10) {
+        printf("\n--- TIENDA LEGO: MENU DE USUARIO ---\n");
+        printf("1. Ver catalogo de productos\n");
+        printf("2. Ver detalle de un producto\n");
+        printf("3. Añadir producto al carrito\n");
+        printf("4. Eliminar un producto del carrito\n");
+        printf("5. Vaciar carrito completo\n");
+        printf("6. Ver carrito y confirmar pedido\n");
+        printf("7. Consultar historial de pedidos\n");
+        printf("8. Ver todas las valoraciones\n");
+        printf("9. Dejar una valoracion\n");
+        printf("10. Salir\n");
+        printf("Seleccione una opcion: ");
+        scanf("%d", &opcion);
 
         if (opcion == 1) {
             enviarYRecibir(sock, "LISTAR");
         }
+
         else if (opcion == 2) {
             int id;
             char comando[100];
+
             printf("Introduce el ID del producto que deseas consultar: ");
             scanf("%d", &id);
+
             sprintf(comando, "GET_PRODUCT_DETAIL;%d", id);
             enviarYRecibir(sock, comando);
         }
+
         else if (opcion == 3) {
             int id, cant;
+
             printf("ID del producto a añadir: ");
             scanf("%d", &id);
+
             printf("Cantidad: ");
             scanf("%d", &cant);
 
-            ItemCarrito item = {id, cant};
-            carrito.push_back(item);
-            printf("Producto añadido al carrito local.\n");
+            if (cant <= 0) {
+                printf("La cantidad debe ser mayor que 0.\n");
+            } else {
+                ItemCarrito item = {id, cant};
+                carrito.push_back(item);
+                printf("Producto añadido al carrito local.\n");
+            }
         }
+
         else if (opcion == 4) {
+            eliminarUnProductoCarrito(carrito);
+        }
+
+        else if (opcion == 5) {
+            vaciarCarrito(carrito);
+        }
+
+        else if (opcion == 6) {
             if (carrito.empty()) {
-                printf("El carrito está vacío.\n");
+                printf("El carrito esta vacio.\n");
             } else {
                 printf("\n--- TU CARRITO ---\n");
+
                 for (const auto& item : carrito) {
-                    printf("ID Producto: %d | Cantidad: %d\n", item.id_producto, item.cantidad);
+                    printf("ID Producto: %d | Cantidad: %d\n",
+                           item.id_producto,
+                           item.cantidad);
                 }
 
                 char confirmar;
@@ -289,30 +352,43 @@ void menuUsuario(SOCKET sock, int idUsuario) {
                     sprintf(comando, "CREATE_ORDER;%d;", idUsuario);
 
                     char infoProductos[512] = "";
+
                     for (size_t i = 0; i < carrito.size(); ++i) {
                         char temp[50];
-                        sprintf(temp, "%d:%d", carrito[i].id_producto, carrito[i].cantidad);
+
+                        sprintf(temp, "%d:%d",
+                                carrito[i].id_producto,
+                                carrito[i].cantidad);
+
                         strcat(infoProductos, temp);
+
                         if (i < carrito.size() - 1) {
                             strcat(infoProductos, ",");
                         }
                     }
+
                     strcat(comando, infoProductos);
 
                     enviarYRecibir(sock, comando);
                     carrito.clear();
+                } else {
+                    printf("Pedido cancelado.\n");
                 }
             }
         }
-        else if (opcion == 5) {
+
+        else if (opcion == 7) {
             char comando[100];
+
             sprintf(comando, "GET_ORDERS;%d", idUsuario);
             enviarYRecibir(sock, comando);
         }
-        else if (opcion == 6) {
+
+        else if (opcion == 8) {
             enviarYRecibir(sock, "VALORACIONES");
         }
-        else if (opcion == 7) {
+
+        else if (opcion == 9) {
             int id_prod, puntuacion;
             char comentario[200];
             char comando[512];
@@ -326,19 +402,26 @@ void menuUsuario(SOCKET sock, int idUsuario) {
             printf("Comentario: ");
             scanf(" %[^\n]", comentario);
 
-            sprintf(comando, "ADD_VALORACION;%d;%d;%d;%s", idUsuario, id_prod, puntuacion, comentario);
+            sprintf(comando,
+                    "ADD_VALORACION;%d;%d;%d;%s",
+                    idUsuario,
+                    id_prod,
+                    puntuacion,
+                    comentario);
+
             enviarYRecibir(sock, comando);
         }
-        else if (opcion == 8) {
+
+        else if (opcion == 10) {
             enviarYRecibir(sock, "SALIR");
             printf("Cerrando sesión de usuario...\n");
         }
+
         else {
             printf("Opcion no valida.\n");
         }
     }
 }
-
 int main() {
     setbuf(stdout, NULL);
 
